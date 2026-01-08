@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>test</title>
+
+    <% if (htmlWebpackPlugin.options.cdn) { %>
+        <% Object.keys(htmlWebpackPlugin.options.cdn).forEach(function (libName) { %>
+            <% const id = libName + "CdnKey" %>
+            <script>
+                 window["<%= id %>"] = <%= JSON.stringify(htmlWebpackPlugin.options.cdn[libName].slice(1)) %>;
+            </script>
+                <script id="<%= id %>" src="<%= htmlWebpackPlugin.options.cdn[libName][0] %>" onerror="window[id].pop()"></script>
+            <% }) %>
+                <% } %>
+
+</head>
+
+<body>
+    <div id="container"></div>
+</body>
+
+</html>

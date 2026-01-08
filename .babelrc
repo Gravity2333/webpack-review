@@ -1,0 +1,26 @@
+{
+    "presets": [
+        [
+            "@babel/preset-env",
+            {
+                // "corejs": 3,
+                // "useBuiltIns": "usage",
+                // "targets": ">0.1%"
+            }
+        ],
+        [
+            "@babel/preset-react",
+            {
+                "runtime": "automatic"
+            }
+        ]
+    ],
+    "env": {
+        "development": {
+            "plugins": [
+                "react-refresh/babel"
+            ]
+        }
+    },
+    "plugins": []
+}

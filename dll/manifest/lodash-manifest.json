@@ -1,0 +1,11 @@
+{
+    "name": "lodash",
+    "content": {
+        "./node_modules/.pnpm/lodash@4.15.0/node_modules/lodash/lodash.js": {
+            "id": 458,
+            "buildMeta": {
+                "treatAsCommonJs": true
+            }
+        }
+    }
+}
