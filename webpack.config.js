@@ -15,13 +15,15 @@ const CopyWebpackPlugin = require("copy-webpack-plugin");
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
 const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin");
 
-/** webpack 配置说明书 */
+/** Webpack 配置说明书 */
 module.exports = {
-  /** 运行模式 */
-  mode: "development",
-  // devtool: "eval-cheap-module-source-map",
-  // devtool: "source-map",
-  /** 打包结果运行环境 */
+  /** =========================================== 预设相关 =========================================== */
+  /** 打包结果运行环境
+   *  默认值为 web 也可以设置为 node
+   *  默认打包代码的目标运行环境!
+   *  如果配置node 则默认目标代码会运行在node中，那么就不会默认当前环境中有window
+   *  如果配置web，那么不会把fs path等当成环境工具
+   */
   target: "web",
   /**
    * 设置路径上下文为项目根目录
@@ -32,6 +34,7 @@ module.exports = {
    * 对于一些plugin 不会做强约束，某些插件可能会不使用这个属性!
    */
   context: path.resolve(__dirname),
+  /** =========================================== 出入口相关 =========================================== */
   /** 设置入口 extry
    *  设置一个向对路径，这个路径会根据context上下文计算 有三种配置方式
    * 1. 一个路径 一个入口 一个chunk
@@ -75,6 +78,13 @@ module.exports = {
      *               (2) 如果没设置 那么 id 和 name 一样，由chunkId决定，在chunkId named的情况下，为路径截断 src_page_util_tool_js
      * [id] 为 chunkId 由optimization.chunkId配置 包含 named | deterministic | natural
      *      生产模式默认为 deterministic 根据name生成的短hash 开发模式为 named 即和name一样
+     *
+     * 几种 hash
+     * chunkhash 根据一个chunk所有的内容生成的hash值，一般chunk内的模块变化，hash就会变化
+     * hash 整个项目的chunkhash值最后生成的hash 只要有模块变化，hash就变
+     * contenthash chunk被输出到文件之前生成 输出的文件内容只要变化 就变化
+     * (webpack 5 已经推荐使用contenthash)
+     * css 这种和js无关的文件 也建议用contenthash
      */
 
     filename: "web-static/js/[name]_[id]_[chunkhash:8].js", // 配置输出文件名称
@@ -111,46 +121,140 @@ module.exports = {
     /** 允许输出module */
     outputModule: true, // 开启esmodule导出
   },
-  /** 模块解析配置 */
+  /** =========================================== 路径解析配置相关 =========================================== */
+  /**
+   * node 模块解析
+   * 1. 如果是绝对路径 / 相对路径
+   *   查看当前路径是不是个文件 如果没有后缀 会先补 .js .json .node
+   *   如果当前路径是个目录，查看有无packages.json 如果有 找main字段 如果没有 在当前目录下找 index.js index.json index.node
+   *
+   *  2. 如果引入的是一个模块
+   *    如果是node内置模块，那么直接引入即可
+   *    如果不是node内部模块，去node_modules中，找 看有无对应的文件 补 .js .json .node
+   *    再找有无目录，如果有目录 按照目录解析 先找package.json 后找index.js index.json index.node
+   *    还是没有 找上层的node_modules!
+   */
+  /** 模块解析配置
+   *  这个模块解析配置就是模仿node的解析，但是变成了可配置的 有更强大的功能
+   */
   resolve: {
+    /** 如果是模块名称，默认查找的目录 默认node_modules */
+    modules: ["node_modules"],
+    /** 默认补充的后缀名 */
     extensions: [".js", ".jsx", ".ts", ".tsx"],
+    /** 默认文件名 默认index */
+    mainFiles: ["index"],
+    /** 在描述文件 (package.json)中，默认查找的入口字段名 默认为main */
+    mainFields: ["main"],
+    /** 描述文件名 默认为package.json */
+    descriptionFiles: ["package.json"],
+    /** 别名配置，建议使用绝对路径配置 */
+    alias: {
+      /** alias 建议用绝对路径 */
+      "@assets": path.resolve(__dirname, "./src/assets"),
+    },
+  },
+  /** loader解析配置
+   *  用来配置webpack如何查找loaders 配置字段和resolve类似
+   */
+  resolveLoader: {
+    /** 优先查找./loader目录 */
+    modules: ["./loaders", "node_modules"],
+    extensions: [".js"],
     mainFiles: ["index"],
     mainFields: ["main"],
     descriptionFiles: ["package.json"],
-    alias: {
-      "@hello": "./src/hello.js",
-    },
   },
-
+  /** =========================================== 开发环境搭建相关 =========================================== */
+  /** 运行模式 */
+  mode: "development",
+  /** devtool 用来配置source-map的生成策略，一般用在开发阶段!
+   *  不同的sourcemap策略，会影响开发体验，尤其是hmr
+   *
+   *  source-map的策略一般包含
+   *  eval-xxx 把sourcemap和执行代码放到eval函数内
+   *  source-map 把源码地图单独生成文件
+   *  inline-xxx 把源码地图通过sourceUrl的方式 注释到文件中
+   *
+   *  每一种存放位置都包含不同颗粒度的生成策略
+   *  比如
+   *  eval 即只对文件名生成source-map 其他的具体源代码不会映射 放到eval函数内
+   *  eval-source-map 完整的源代码地图 精确到行列 放到eval函数中 精确 构建性能相对低
+   *  eval-cheap-source-map 只精确到行的source-map
+   *  eval-cheap-module-source-map 精确到行的 并且映射loader处理之前代码的源码地图
+   *
+   *  除此以外 还包括 inline-xx xx-source-map
+   *
+   *  其中，开发环境建议使用eval-xx 比如 eval-cheap-module-source-map 其构建性能最好 hmr的性能也最好
+   * 为什么，因为把编译后的代码 和 source-map都放到eval函数内，可以做到模块粒度的热更新，某个模块变动之后，之需要更新
+   * 这个模块对应的eval函数即可，而对于inline 或者完整的sourcemap 其更新单位都是整个文件，或者说是 一个chunk
+   */
+  devtool: "eval-cheap-module-source-map",
+  /** 开发服务器搭建 */
   devServer: {
+    /**
+     * 区分 localhost 127.0.0.1 0.0.0.0 具体ip
+     * localhost = 127.0.0.1 不走网卡 为环回地址，操作系统内短路处理，由于不listen网卡 所以只有本机可以访问
+     * 0.0.0.0 监听所有网卡 任何设备可以访问
+     * 具体ip 比如 10.0.0.9 在当前ip属于网卡的情况下，所有设备可以访问
+     */
     host: "0.0.0.0",
+    /** 监听端口 */
     port: 7664,
+    /** 自动打开页面 */
     open: {
+      // 自动跳转到 /manager
       target: ["/manager"],
     },
+    /** 需要注意关闭 Compression-Webpack-Plugin 避免性能浪费 */
     compress: true,
-    // 所有没匹配到的路径 都返回index.html 适合 browser router SPA
+    /**
+     * 所有没匹配到的路径 都返回index.html 适合 browser router SPA
+     * 我们知道 SPA的前端路由一般分两种 hashRouter 和 historyRouter
+     * histroryRouter在用户真实刷新的时候 比如按回车的时候 会真的去服务器请求数据
+     * 这个配置就是让服务器，只要静态资源没匹配上，就返回index.html
+     */
     historyApiFallback: true,
+    /** 配置代理服务器
+     *  之前的配置方式是 { "/api" : { target: ""} }
+     *  现在的配置方式是 传入个数组 内部的context代替key
+     */
     proxy: [
       {
-        context: ["/api"],
-        target: "http://192.168.1.1",
-        pathRewrite: { "/^api": "/" },
-        changeOrigin: true,
+        context: ["/api"], // 匹配前缀
+        target: "http://192.168.1.1", // 目的转发地址
+        pathRewrite: { "/^api": "/" }, // 重写路径 /api -> /
+        changeOrigin: true, // 把host 从 localhost 改成真正要访问的target对应的host
       },
     ],
+    /**
+     * 开发模式下的静态资源目录 默认情况下为 public目录 即如下配置
+     * 约定 > 配置
+     * 在生产模式中，你需要用Copy-webpack-plugin 把你需要的静态资源 拷贝到构建目录(dist)中
+     *
+     * 注意，在开发环境中， Copy-Webpack-Plugin 也没必要开启，只有在生产环境才启用 因为开了也是无用功 拖慢构建速度
+     */
     static: [
       {
+        /** 映射前缀 */
         publicPath: "/public",
+        /** 绝对路径 真实的映射目录 */
         directory: path.resolve(__dirname, "public"),
       },
     ],
+    /** webpack-dev-middleware配置 */
     devMiddleware: {
+      /** HTTP访问 / 或者 publicPath根路径时默认返回的文件名 */
       index: "index.html",
+      /** 资源路径 表示把构建结果放到 /manager路径下，这里一般需要配置的和output.publicPath一致 */
       publicPath: "/manager",
     },
-    hot: true, // HMR
+    /** 开启remake替换 */
+    hot: true, // HMR 需要使用 module.hot.accept 开启 / module.hot.dispose 处理副作用
+    // 如果使用react 请使用 react-refresh-plugin 其会自己处理accept 你只需要自己dispose副作用
+    // babel 需要配置   "react-refresh/babel" 因为需要借助babel注入 accept的代码
   },
+  /** =========================================== 模块解析相关 =========================================== */
   /** 配置模块解析 */
   module: {
     noParse: [/jquery/],
@@ -253,7 +357,7 @@ module.exports = {
         test: /\.png|jpe?g|gif|svg/,
         use: [
           {
-            loader: "./loaders/my-url-loader",
+            loader: "my-url-loader",
           },
         ],
       },
@@ -264,6 +368,7 @@ module.exports = {
   // externals: {
   //   jquery: "$",
   // },
+  /** =========================================== 插件相关 =========================================== */
   plugins: [
     new HtmlWebpackPlugin({
       template: "./template.ejs",
@@ -277,14 +382,7 @@ module.exports = {
       //   lodash: ["/manager/lib/lodash.js"],
       // },
     }),
-    // new CopyWebpackPlugin({
-    //   patterns: [
-    //     {
-    //       from: "./dll/lib",
-    //       to: "./lib",
-    //     },
-    //   ],
-    // }),
+
     new DefinePlugin({
       "process.env.NODE_ENV": JSON.stringify("development"),
       PI: 3.1415926,
@@ -301,11 +399,14 @@ module.exports = {
       _: "lodash",
     }),
     new CssMinimizerWebpackPlugin(),
-    new CompressionWebpackPlugin({
-      test: /\.(js|css|less)$/,
-      algorithm: "gzip", //压缩算法
-      minRatio: 0.7, // 压缩倍率
-    }),
+    /** CompressionWebpackPlugin 不需要在开发模式中开启，因为devServer自己会开启压缩，引入这个插件完全就是无用功，拖慢构建速度 */
+    process.env.NODE_ENV === "production"
+      ? new CompressionWebpackPlugin({
+          test: /\.(js|css|less)$/,
+          algorithm: "gzip", //压缩算法
+          minRatio: 0.7, // 压缩倍率
+        })
+      : null,
     new TerserWebpackPlugin({
       terserOptions: {
         compress: {
@@ -321,14 +422,30 @@ module.exports = {
       extractComments: true,
       parallel: true,
     }),
-    // new DllReferencePlugin({
-    //   manifest: path.resolve(__dirname, "./dll/manifest/lodash-manifest.json"),
-    // }),
+    /** Copy-Webpack-Plugin 生产环境用 */
+    process.env.NODE_ENV === "production"
+      ? new CopyWebpackPlugin({
+          patterns: [
+            {
+              from: "./dll/lib",
+              to: "./lib",
+            },
+            {
+              from: "./public",
+              to: "./",
+            },
+          ],
+        })
+      : null,
     process.env.Analyze == 1 ? new BundleAnalyzerPlugin() : null,
     process.env.NODE_ENV == "development"
       ? new ReactRefreshWebpackPlugin()
       : null,
-  ],
+    // new DllReferencePlugin({
+    //   manifest: path.resolve(__dirname, "./dll/manifest/lodash-manifest.json"),
+    // }),
+  ].filter((f) => f),
+  /** =========================================== 优化相关 =========================================== */
   optimization: {
     minimize: false,
     usedExports: true,
