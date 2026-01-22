@@ -1,0 +1,6 @@
+      /**
+       * asset/xxx 系列 处理资源的导入
+       * type: asset/resource 会生成独立的文件到输出目录中，并且返回输出文件的地址 适用于大的文件
+       * type: asset/inline 把图片转换成DataURL的形式输出 适合小文件
+       * type: asset/source 把文件原封不动的按照字符串的方式输出，可能会乱码
+       */

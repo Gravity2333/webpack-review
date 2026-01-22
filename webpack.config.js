@@ -255,16 +255,51 @@ module.exports = {
     // babel 需要配置   "react-refresh/babel" 因为需要借助babel注入 accept的代码
   },
   /** =========================================== 模块解析相关 =========================================== */
-  /** 配置模块解析 */
+  /** 配置模块解析
+   *  用来设置模块解析相关配置
+   */
   module: {
+    /**
+     * noParse 是一种优化的手段
+     * 对于一些已经完成打包的模块，不需要再反复的打包了，可以使用noParse跳过以提升构建速度
+     * noParse传入 正则，webpack处理module的时候会把每个module的路径path使用这个正则进行匹配，如果匹配成功 则跳过对这个模块的编译
+     *
+     * ⚠️ 需要注意！ 不解析的模块必须满足两个要求
+     * 1. 不能是用esmodule的方式导出，因为webpack可以原生支持cjs的导出，但是esmodule由于引入新的语法 所以不支持
+     * 2. 不能包含导入，因为不解析代表webpack不去处理依赖关系，所以导入语句在noparse下不会生效
+     */
     noParse: [/jquery/],
+    /**
+     * rules用来配置loader
+     * 基本配置为
+     * test 传入正则 匹配模块路径
+     * use 使用的loader 可以传入 字符串数组，对象数组
+     * 执行的顺序为 从下到上 从右到左
+     *
+     * loader的执行时机，在读取模块内容到解析成AST之间会执行loader 完成代码的转换
+     * loader返回的代码字符串必须满足javascript语法规范
+     *
+     * loader 处理包含 pitch阶段
+     * pitch阶段返回 非空字符串 会熔断，不会继续执行后续loader
+     *
+     * pitch方法会返回previousLoaders 使用!loader!loader2!loader3!target file的方式
+     * 之需要 !!${previousLoaders} 即可
+     *
+     * 异步 loader 可以使用this.async() 获取callback
+     * 在loader结束之后 调用callback
+     */
     rules: [
       {
         test: /\.jsx/,
         use: [
-          "cache-loader",
-          "thread-loader",
+          /** 这是一个常见的优化组合
+           * cache-loader 用来缓存loader处理结果，如果包含缓存，会在pitch阶段熔断
+           * thread-loader 会开启多线程处理loader
+           */
+          "thread-loader", // 最前面
+          "cache-loader", // 需要缓存的loader前面
           {
+            // 使用babel-loader处理jsx/tsx
             loader: "babel-loader",
           },
         ],
@@ -272,8 +307,11 @@ module.exports = {
       {
         test: /\.less$/,
         use: [
+          // 把cssloader的结果，通过style的方式插入到header
           // "style-loader",
+          // 把cssloader的结果，作为.css文件输出到输出目录
           MiniCssExtractPlugin.loader,
+          // 处理css文件 并且处理css模块化
           {
             loader: "css-loader",
             options: {
@@ -281,15 +319,17 @@ module.exports = {
               esModule: false, // 强制使用 ES6 模块导出
             },
           },
+          // 处理less文件
           "less-loader",
         ],
       },
+      // 以下为css相关loader的自己实现
       // {
       //   test: /\.css$/,
       //   use: [
-      //     "./loaders/my-style-loader",
+      //     "my-style-loader",
       //     {
-      //       loader: "./loaders/my-css-loader",
+      //       loader: ".my-css-loader",
       //       options: {
       //         module: true,
       //       },
@@ -299,22 +339,28 @@ module.exports = {
       // {
       //   test: /\.css$/,
       //   use: [
-      //     "./loaders/my-style-loader-pitch",
+      //     "/my-style-loader-pitch",
       //     {
-      //       loader: "./loaders/my-css-loader-pitch",
+      //       loader: "/my-css-loader-pitch",
       //       options: {
       //         module: true,
       //       },
       //     },
       //     // {
-      //     //   loader: "./loaders/delay-loader",
+      //     //   loader: "/delay-loader",
       //     //   options: {
       //     //     delay: 10000,
       //     //   },
       //     // },
       //   ],
       // },
-      // 配置 assets
+
+      /**
+       * asset/xxx 系列 处理资源的导入 - 支持[ext]
+       * type: asset/resource 会生成独立的文件到输出目录中，并且返回输出文件的地址 适用于大的文件
+       * type: asset/inline 把图片转换成DataURL的形式输出 适合小文件
+       * type: asset/source 把文件原封不动的按照字符串的方式输出，如果文件不是utf-8可能会乱码
+       */
       // {
       //   test: /\.png|jpe?g|gif|svg/,
       //   type: "asset/resource",
@@ -325,18 +371,36 @@ module.exports = {
       // {
       //   test: /\.png|jpe?g|gif|svg/,
       //   type: "asset/source",
-
       // },
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        type: "asset/inline",
+      },
+
+      /** 这种适合txt文件 */
+      {
+        test: /\.txt$/i,
+        type: "asset/source",
+      },
+
+      /** 区分rawloader
+       * raw-loader 和 asset/source 不一样
+       * rawLoader 会直接把node Buffer 的结果转换为JSON输出
+       */
       // {
-      //   test: /\.(png|jpe?g|gif|svg)$/i,
-      //   type: "asset/inline",
+      //   test: /\.png|jpe?g|gif|svg/,
+      //   use: [
+      //     {
+      //       loader: "my-raw-loader",
+      //     },
+      //   ],
       // },
 
       // {
       //   test: /\.png|jpe?g|gif|svg/,
       //   use: [
       //     {
-      //       loader: "./loaders/my-file-loader",
+      //       loader: "/my-file-loader",
       //       options: {
       //         generator: {
       //           filename: "assets/[name]-[hash:8][ext]",
@@ -349,18 +413,10 @@ module.exports = {
       //   test: /\.png|jpe?g|gif|svg/,
       //   use: [
       //     {
-      //       loader: "./loaders/my-raw-loader",
+      //       loader: "/my-raw-loader",
       //     },
       //   ],
       // },
-      {
-        test: /\.png|jpe?g|gif|svg/,
-        use: [
-          {
-            loader: "my-url-loader",
-          },
-        ],
-      },
     ],
   },
   /** 配置外部依赖 */
