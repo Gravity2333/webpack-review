@@ -169,7 +169,7 @@ module.exports = {
   },
   /** =========================================== 开发环境搭建相关 =========================================== */
   /** 运行模式 */
-  mode: "production",
+  mode: process.env.NODE_ENV,
   /** devtool 用来配置source-map的生成策略，一般用在开发阶段!
    *  不同的sourcemap策略，会影响开发体验，尤其是hmr
    *
@@ -435,11 +435,11 @@ module.exports = {
   },
   /** 配置外部依赖 */
   /** 外部依赖导入方式 var */
-  externalsType: "var",
-  /** 配置 外部依赖 到 内部包名称的映射 */
-  externals: {
-    jquery: "$",
-  },
+  // externalsType: "var",
+  // /** 配置 外部依赖 到 内部包名称的映射 */
+  // externals: {
+  //   jquery: "$",
+  // },
   /** =========================================== 插件相关 =========================================== */
   /** 用来配置插件Plugin
    *  插件使用 tapable库 通过注册钩子函数的方式，让开发者接入编译流程
@@ -457,36 +457,36 @@ module.exports = {
       cdn: {
         jquery: [
           /** backup cdn */
-          "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
-          "https://cdn.bootcdn.net/ajax/libs/react-dom/16.0.0-beta.1/cjs/react-dom-node-stream.production.min.js",
+          // "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
+          // "https://cdn.bootcdn.net/ajax/libs/react-dom/16.0.0-beta.1/cjs/react-dom-node-stream.production.min.js",
         ],
-        lodash: ["/manager/lib/lodash.js"],
+        // lodash: ["/manager/lib/lodash.js"],
       },
     }),
     /** 用来定义一些全局变量 */
     new DefinePlugin({
-      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
+      // "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
       PI: 3.1415926,
     }),
     /** shimming 垫片
      * 项目中需要用到 $ / _ 这些 webpack会自动将其和 jquery lodash等 绑定
      */
     new ProvidePlugin({
-      _: "lodash",
+      // _: "lodash",
       $: "jquery",
     }),
     /** PurgeCssPlugin 用来处理未使用的 css [对cssmodule无效]
      * path 查找需要比对的文件
      * 用到glob库 返回src下所有的文件
      */
-    new PurgeCSSPlugin({
-      /** 写绝对路径要检查哪些文件是否用过css */
-      paths: (() => {
-        return glob.sync(path.resolve(__dirname, "./src/**/*"), {
-          nodir: true, // 不匹配目录
-        });
-      })(),
-    }),
+    // new PurgeCSSPlugin({
+    //   /** 写绝对路径要检查哪些文件是否用过css */
+    //   paths: (() => {
+    //     return glob.sync(path.resolve(__dirname, "./src/**/*"), {
+    //       nodir: true, // 不匹配目录
+    //     });
+    //   })(),
+    // }),
     /** 把css生成独立的css文件 */
     new MiniCssExtractPlugin({
       filename: "web-static/css/[name]-[contenthash:8].css",
@@ -608,48 +608,48 @@ module.exports = {
      * 1. 多个入口共同引用一个模块
      * 2. 体积大 不经常变动的模块
      */
-    splitChunks: {
-      /** 优化的作用范围 默认为 async 即仅对动态导入模块进行优化
-       *  注意，对动态模块的拆分是webpack的默认行为！
-       *  initial 为 仅对同步模块进行拆分，不对异步引入模块进行拆分
-       *  all 对同步 异步模块 一起进行拆分优化
-       */
-      chunks: "all",
-      minSize: 200,
-      // maxSize: 200000,
-      // 最少引用次数，大于这个数才拆包
-      minChunks: 1,
-      // 最大同步请求
-      maxInitialRequests: 30,
-      // 最大异步请求
-      maxAsyncRequests: 30,
-      /** 缓存组 只有命中才会优化 */
-      cacheGroups: {
-        reactVendors: {
-          test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, // 匹配 react 和 react-dom 模块
-          name: "react-vendors", // 自定义生成的 chunk 名称
-          priority: 0, // 优先级高于 defaultVendors
-          // enforce: true, // 强制拆分该缓存组
-        },
-        jqueryVersors: {
-          test: /[\\/]node_modules[\\/](jquery)[\\/]/, // 匹配 react 和 react-dom 模块
-          name: "jquery-vendors", // 自定义生成的 chunk 名称
-          priority: 0, // 优先级高于 defaultVendors
-          // enforce: true, // 强制拆分该缓存组
-        },
-        // 默认 缓存组配置
-        defaultVendors: {
-          test: /[\\/]node_modules[\\/]/, // 匹配 node_modules 中的模块
-          priority: -10, // 优先级
-          reuseExistingChunk: true, // 如果当前 chunk 包含已从主 bundle 中拆分出的模块，则重用该模块
-        },
-        default: {
-          minChunks: 2, // 被至少两个 chunks 共享的模块
-          priority: -20, // 优先级低于 vendors
-          reuseExistingChunk: true, // 重用已存在的 chunk
-        },
-      },
-    },
+    // splitChunks: {
+    //   /** 优化的作用范围 默认为 async 即仅对动态导入模块进行优化
+    //    *  注意，对动态模块的拆分是webpack的默认行为！
+    //    *  initial 为 仅对同步模块进行拆分，不对异步引入模块进行拆分
+    //    *  all 对同步 异步模块 一起进行拆分优化
+    //    */
+    //   chunks: "all",
+    //   minSize: 200,
+    //   // maxSize: 200000,
+    //   // 最少引用次数，大于这个数才拆包
+    //   minChunks: 1,
+    //   // 最大同步请求
+    //   maxInitialRequests: 30,
+    //   // 最大异步请求
+    //   maxAsyncRequests: 30,
+    //   /** 缓存组 只有命中才会优化 */
+    //   cacheGroups: {
+    //     reactVendors: {
+    //       test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, // 匹配 react 和 react-dom 模块
+    //       name: "react-vendors", // 自定义生成的 chunk 名称
+    //       priority: 0, // 优先级高于 defaultVendors
+    //       // enforce: true, // 强制拆分该缓存组
+    //     },
+    //     jqueryVersors: {
+    //       test: /[\\/]node_modules[\\/](jquery)[\\/]/, // 匹配 react 和 react-dom 模块
+    //       name: "jquery-vendors", // 自定义生成的 chunk 名称
+    //       priority: 0, // 优先级高于 defaultVendors
+    //       // enforce: true, // 强制拆分该缓存组
+    //     },
+    //     // 默认 缓存组配置
+    //     defaultVendors: {
+    //       test: /[\\/]node_modules[\\/]/, // 匹配 node_modules 中的模块
+    //       priority: -10, // 优先级
+    //       reuseExistingChunk: true, // 如果当前 chunk 包含已从主 bundle 中拆分出的模块，则重用该模块
+    //     },
+    //     default: {
+    //       minChunks: 2, // 被至少两个 chunks 共享的模块
+    //       priority: -20, // 优先级低于 vendors
+    //       reuseExistingChunk: true, // 重用已存在的 chunk
+    //     },
+    //   },
+    // },
   },
   performance: {
     hints: false,

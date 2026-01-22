@@ -1,7 +1,67 @@
-.container{
-    background-color: yellow
+body,html{
+  margin: 0;
+  padding: 0;
+}
+.container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f5f7fa;
+  color: #333;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.header{
-   background-color: gray
+.header {
+  background: linear-gradient(90deg, #4b6cb7, #182848);
+  color: #fff;
+  padding: 20px 40px;
+  text-align: center;
+  h1 {
+    margin: 0;
+    font-size: 28px;
+  }
+}
+
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px 40px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 20px;
+  transition: transform 0.2s ease;
+  &:hover {
+    transform: translateY(-5px);
+  }
+  h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 20px;
+    color: #4b6cb7;
+  }
+}
+
+.image {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.text {
+  background: #f0f0f0;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.footer {
+  text-align: center;
+  padding: 15px 0;
+  background: #182848;
+  color: #fff;
 }
