@@ -8,13 +8,13 @@ const {
 } = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const AssetEmitStatPlugin = require("./plugins/AssetEmitStatPlugin");
-const CssMinimizerWebpackPlugin = require("css-minimizer-webpack-plugin");
 const CompressionWebpackPlugin = require("compression-webpack-plugin");
 const TerserWebpackPlugin = require("terser-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
 const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin");
 const { PurgeCSSPlugin } = require("purgecss-webpack-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 const { glob } = require("glob");
 
 /** Webpack 配置说明书 */
@@ -169,7 +169,7 @@ module.exports = {
   },
   /** =========================================== 开发环境搭建相关 =========================================== */
   /** 运行模式 */
-  mode: "development",
+  mode: "production",
   /** devtool 用来配置source-map的生成策略，一般用在开发阶段!
    *  不同的sourcemap策略，会影响开发体验，尤其是hmr
    *
@@ -434,10 +434,12 @@ module.exports = {
     ],
   },
   /** 配置外部依赖 */
-  // externalsType: "var",
-  // externals: {
-  //   jquery: "$",
-  // },
+  /** 外部依赖导入方式 var */
+  externalsType: "var",
+  /** 配置 外部依赖 到 内部包名称的映射 */
+  externals: {
+    jquery: "$",
+  },
   /** =========================================== 插件相关 =========================================== */
   /** 用来配置插件Plugin
    *  插件使用 tapable库 通过注册钩子函数的方式，让开发者接入编译流程
@@ -448,21 +450,22 @@ module.exports = {
    * aftercompile emit afterEmit doe failed
    */
   plugins: [
+    /** 自动生成HTML文档 */
     new HtmlWebpackPlugin({
       template: "./template.ejs",
       inject: "body",
-      // cdn: {
-      //   jquery: [
-      //     /** backup cdn */
-      //     "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
-      //     "https://cdn.bootcdn.net/ajax/libs/react-dom/16.0.0-beta.1/cjs/react-dom-node-stream.production.min.js",
-      //   ],
-      //   lodash: ["/manager/lib/lodash.js"],
-      // },
+      cdn: {
+        jquery: [
+          /** backup cdn */
+          "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
+          "https://cdn.bootcdn.net/ajax/libs/react-dom/16.0.0-beta.1/cjs/react-dom-node-stream.production.min.js",
+        ],
+        lodash: ["/manager/lib/lodash.js"],
+      },
     }),
     /** 用来定义一些全局变量 */
     new DefinePlugin({
-      "process.env.NODE_ENV": JSON.stringify("development"),
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
       PI: 3.1415926,
     }),
     /** shimming 垫片
@@ -530,15 +533,46 @@ module.exports = {
       : null,
     /** 用来分析打包结果 */
     process.env.Analyze == 1 ? new BundleAnalyzerPlugin() : null,
+    /** 手动分包引入manifest.json使用
+     *  手动分包过程
+     *  DllPlugin 对资源打包 生成manifest.json
+     *  CopyWebpackPlugin 把静态资源引入输出目录
+     *  HtmlWebpackPlugin配置引入资源
+     *  DllReferencePlugin 引入manifest
+     */
     // new DllReferencePlugin({
     //   manifest: path.resolve(__dirname, "./dll/manifest/lodash-manifest.json"),
     // }),
   ].filter((f) => f),
   /** =========================================== 优化相关 =========================================== */
   optimization: {
-    minimize: false,
+    /** chunk的id 包含 named 名称 | deterministic 名称短hash | natural 数字
+     *  对于动态引入的模块，需要用魔法注释 WebpackChunkName 配置chunkName
+     *  如果不配置 name 和 id 都由chunkId控制
+     *  默认name为路径 _ 连接 比如 src_page_daynmic_jsx
+     */
+    chunkIds: "deterministic",
+    /** moduleId 模块的id
+     *  模块name默认为路径
+     *  named会把id设置成一个可读的名称 一般为路径
+     *  natural 为数字
+     *  deterministic为根据名称生成的短hash
+     */
+    moduleIds: "named",
+    /** minimizer 是存放 */
+    minimize: true,
     minimizer: [
-      new CssMinimizerWebpackPlugin(),
+      /** 压缩 CSS */
+      new CssMinimizerPlugin(),
+      /** 压缩 混淆 JS
+       * terser 一定要放在 minimizer 而不是 plugin
+       * 对于CopyWebpackPlugin拷贝的内容 也进行压缩
+       *
+       * 对于没有副作用的函数调用 注意是调用
+       * 需要使用 /*#__PURE__*\/ 标记 让terser可以删除dead_code
+       *
+       * 也可以在package.json中设置sideEffects: [] 标记哪些文件有副作用
+       */
       new TerserWebpackPlugin({
         terserOptions: {
           compress: {
@@ -551,46 +585,71 @@ module.exports = {
             toplevel: true,
           },
         },
+        // 提取注释信息
         extractComments: true,
+        // 并行压缩
         parallel: true,
       }),
     ].filter((f) => f),
+    /**
+     * treeShaking 优化开关
+     * 注意 必须是 ESModule 静态导入 对于cjs这样的动态导入无法优化，所以尽可能使用支持ESM的模块
+     * treeShaking负责模块之间的未使用标记 注意 只是标记！
+     * 一般为 unused harmony export (harmony export 为esmodule export 因为es6最初立项名字就是 harmony!)
+     *
+     * 最终会由 Terser 删除这些标记
+     * 注意 /*#__PURE__ 一般为人工标记 webpack不会加这个标记!
+     */
     usedExports: true,
-    chunkIds: "deterministic",
-    // moduleIds: "deterministic",
-    // splitChunks: {
-    //   chunks: "all",
-    //   minSize: 200,
-    //   // maxSize: 200000,
-    //   minChunks: 1,
-    //   maxInitialRequests: 30,
-    //   maxAsyncRequests: 30,
-    //   cacheGroups: {
-    //     reactVendors: {
-    //       test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, // 匹配 react 和 react-dom 模块
-    //       name: "react-vendors", // 自定义生成的 chunk 名称
-    //       priority: 0, // 优先级高于 defaultVendors
-    //       // enforce: true, // 强制拆分该缓存组
-    //     },
-    //     jqueryVersors: {
-    //       test: /[\\/]node_modules[\\/](jquery)[\\/]/, // 匹配 react 和 react-dom 模块
-    //       name: "jquery-vendors", // 自定义生成的 chunk 名称
-    //       priority: 0, // 优先级高于 defaultVendors
-    //       // enforce: true, // 强制拆分该缓存组
-    //     },
-    //     // 缓存组配置
-    //     defaultVendors: {
-    //       test: /[\\/]node_modules[\\/]/, // 匹配 node_modules 中的模块
-    //       priority: -10, // 优先级
-    //       reuseExistingChunk: true, // 如果当前 chunk 包含已从主 bundle 中拆分出的模块，则重用该模块
-    //     },
-    //     default: {
-    //       minChunks: 2, // 被至少两个 chunks 共享的模块
-    //       priority: -20, // 优先级低于 vendors
-    //       reuseExistingChunk: true, // 重用已存在的 chunk
-    //     },
-    //   },
-    // },
+
+    /** 自动拆包优化
+     *  一般配合 Analyze模式使用
+     * 什么时候不需要拆包
+     * 1. 多个入口共同引用一个模块
+     * 2. 体积大 不经常变动的模块
+     */
+    splitChunks: {
+      /** 优化的作用范围 默认为 async 即仅对动态导入模块进行优化
+       *  注意，对动态模块的拆分是webpack的默认行为！
+       *  initial 为 仅对同步模块进行拆分，不对异步引入模块进行拆分
+       *  all 对同步 异步模块 一起进行拆分优化
+       */
+      chunks: "all",
+      minSize: 200,
+      // maxSize: 200000,
+      // 最少引用次数，大于这个数才拆包
+      minChunks: 1,
+      // 最大同步请求
+      maxInitialRequests: 30,
+      // 最大异步请求
+      maxAsyncRequests: 30,
+      /** 缓存组 只有命中才会优化 */
+      cacheGroups: {
+        reactVendors: {
+          test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, // 匹配 react 和 react-dom 模块
+          name: "react-vendors", // 自定义生成的 chunk 名称
+          priority: 0, // 优先级高于 defaultVendors
+          // enforce: true, // 强制拆分该缓存组
+        },
+        jqueryVersors: {
+          test: /[\\/]node_modules[\\/](jquery)[\\/]/, // 匹配 react 和 react-dom 模块
+          name: "jquery-vendors", // 自定义生成的 chunk 名称
+          priority: 0, // 优先级高于 defaultVendors
+          // enforce: true, // 强制拆分该缓存组
+        },
+        // 默认 缓存组配置
+        defaultVendors: {
+          test: /[\\/]node_modules[\\/]/, // 匹配 node_modules 中的模块
+          priority: -10, // 优先级
+          reuseExistingChunk: true, // 如果当前 chunk 包含已从主 bundle 中拆分出的模块，则重用该模块
+        },
+        default: {
+          minChunks: 2, // 被至少两个 chunks 共享的模块
+          priority: -20, // 优先级低于 vendors
+          reuseExistingChunk: true, // 重用已存在的 chunk
+        },
+      },
+    },
   },
   performance: {
     hints: false,

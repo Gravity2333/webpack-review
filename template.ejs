@@ -8,13 +8,14 @@
 
     <% if (htmlWebpackPlugin.options.cdn) { %>
         <% Object.keys(htmlWebpackPlugin.options.cdn).forEach(function (libName) { %>
-            <% const id = libName + "CdnKey" %>
-            <script>
-                 window["<%= id %>"] = <%= JSON.stringify(htmlWebpackPlugin.options.cdn[libName].slice(1)) %>;
-            </script>
-                <script id="<%= id %>" src="<%= htmlWebpackPlugin.options.cdn[libName][0] %>" onerror="window[id].pop()"></script>
-            <% }) %>
-                <% } %>
+            <% const id=libName + "CdnKey" %>
+                <script>
+                    window["<%= id %>"] = <%= JSON.stringify(htmlWebpackPlugin.options.cdn[libName].slice(1)) %>;
+                </script>
+                <script id="<%= id %>" src="<%= htmlWebpackPlugin.options.cdn[libName][0] %>"
+                    onerror="window[id].pop()"></script>
+                <% }) %>
+                    <% } %>
 
 </head>
 
