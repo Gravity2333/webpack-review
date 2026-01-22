@@ -1,9 +1,9 @@
-module.exports = class TestPlugin {
+module.exports = class AssetEmitStatPlugin {
   apply(compiler) {
-    compiler.hooks.compilation.tap("TestPlugin", (compliation) => {
+    compiler.hooks.compilation.tap("AssetEmitStatPlugin", (compliation) => {
       console.log("compliation创建完成:");
     });
-    compiler.hooks.emit.tap("TestPlugin", (compliation) => {
+    compiler.hooks.emit.tap("AssetEmitStatPlugin", (compliation) => {
       let assetsResults = "";
       Object.keys(compliation.assets).forEach((filename) => {
         const asset = compliation.assets[filename];

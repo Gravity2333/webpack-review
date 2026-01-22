@@ -7,13 +7,15 @@ const {
   DllReferencePlugin,
 } = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const TestPlugin = require("./plugins/TestPlugin");
+const AssetEmitStatPlugin = require("./plugins/AssetEmitStatPlugin");
 const CssMinimizerWebpackPlugin = require("css-minimizer-webpack-plugin");
 const CompressionWebpackPlugin = require("compression-webpack-plugin");
 const TerserWebpackPlugin = require("terser-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
 const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin");
+const { PurgeCSSPlugin } = require("purgecss-webpack-plugin");
+const { glob } = require("glob");
 
 /** Webpack 配置说明书 */
 module.exports = {
@@ -287,6 +289,18 @@ module.exports = {
      *
      * 异步 loader 可以使用this.async() 获取callback
      * 在loader结束之后 调用callback
+     * 
+     *  webpack 编译过程中 会在模块注册变量
+     * 变量	作用
+      __webpack_public_path__	资源加载基路径
+      __webpack_require__	模块加载函数
+      __webpack_require__.p	publicPath（同上）
+      __webpack_require__.c	module cache
+      __webpack_require__.m	modules map
+      __webpack_require__.e	异步 chunk 加载
+      __webpack_hash__	compilation hash
+      __webpack_nonce__	CSP nonce
+      __webpack_base_uri__	base URI（Webpack 5）
      */
     rules: [
       {
@@ -425,6 +439,14 @@ module.exports = {
   //   jquery: "$",
   // },
   /** =========================================== 插件相关 =========================================== */
+  /** 用来配置插件Plugin
+   *  插件使用 tapable库 通过注册钩子函数的方式，让开发者接入编译流程
+   *
+   * 常见声明周期流程
+   * initialize  run compile compilation make
+   * buildModule succeedModule finishedModules optimize
+   * aftercompile emit afterEmit doe failed
+   */
   plugins: [
     new HtmlWebpackPlugin({
       template: "./template.ejs",
@@ -438,24 +460,46 @@ module.exports = {
       //   lodash: ["/manager/lib/lodash.js"],
       // },
     }),
-
+    /** 用来定义一些全局变量 */
     new DefinePlugin({
       "process.env.NODE_ENV": JSON.stringify("development"),
       PI: 3.1415926,
     }),
+    /** shimming 垫片
+     * 项目中需要用到 $ / _ 这些 webpack会自动将其和 jquery lodash等 绑定
+     */
+    new ProvidePlugin({
+      _: "lodash",
+      $: "jquery",
+    }),
+    /** PurgeCssPlugin 用来处理未使用的 css [对cssmodule无效]
+     * path 查找需要比对的文件
+     * 用到glob库 返回src下所有的文件
+     */
+    new PurgeCSSPlugin({
+      /** 写绝对路径要检查哪些文件是否用过css */
+      paths: (() => {
+        return glob.sync(path.resolve(__dirname, "./src/**/*"), {
+          nodir: true, // 不匹配目录
+        });
+      })(),
+    }),
+    /** 把css生成独立的css文件 */
     new MiniCssExtractPlugin({
       filename: "web-static/css/[name]-[contenthash:8].css",
       chunkFilename: "web-static/[name]-[contenthash:8].css",
     }),
-    new TestPlugin(),
+    /** 自定义的插件 用来输出构建结果信息 */
+    new AssetEmitStatPlugin(),
+    /** 用来输出License文件 */
     new BannerPlugin({
       banner: "liuze authorized",
     }),
-    new ProvidePlugin({
-      _: "lodash",
-    }),
-    new CssMinimizerWebpackPlugin(),
-    /** CompressionWebpackPlugin 不需要在开发模式中开启，因为devServer自己会开启压缩，引入这个插件完全就是无用功，拖慢构建速度 */
+    /**
+     * 用来压缩打包后的文件
+     * CompressionWebpackPlugin 不需要在开发模式中开启，
+     * 因为devServer自己会开启压缩，引入这个插件完全就是无用功，拖慢构建速度
+     *  */
     process.env.NODE_ENV === "production"
       ? new CompressionWebpackPlugin({
           test: /\.(js|css|less)$/,
@@ -463,22 +507,9 @@ module.exports = {
           minRatio: 0.7, // 压缩倍率
         })
       : null,
-    new TerserWebpackPlugin({
-      terserOptions: {
-        compress: {
-          arrows: true,
-          arguments: true,
-          dead_code: true, // 去掉死区
-        },
-        mangle: {
-          // 混淆 替换变量
-          toplevel: true,
-        },
-      },
-      extractComments: true,
-      parallel: true,
-    }),
-    /** Copy-Webpack-Plugin 生产环境用 */
+    /** Copy-Webpack-Plugin 生产环境用
+     *  把不需要编译的文件拷贝到输出目录中
+     */
     process.env.NODE_ENV === "production"
       ? new CopyWebpackPlugin({
           patterns: [
@@ -493,10 +524,12 @@ module.exports = {
           ],
         })
       : null,
-    process.env.Analyze == 1 ? new BundleAnalyzerPlugin() : null,
+    /** 用来自动处理react的hmr优化 */
     process.env.NODE_ENV == "development"
       ? new ReactRefreshWebpackPlugin()
       : null,
+    /** 用来分析打包结果 */
+    process.env.Analyze == 1 ? new BundleAnalyzerPlugin() : null,
     // new DllReferencePlugin({
     //   manifest: path.resolve(__dirname, "./dll/manifest/lodash-manifest.json"),
     // }),
@@ -504,6 +537,24 @@ module.exports = {
   /** =========================================== 优化相关 =========================================== */
   optimization: {
     minimize: false,
+    minimizer: [
+      new CssMinimizerWebpackPlugin(),
+      new TerserWebpackPlugin({
+        terserOptions: {
+          compress: {
+            arrows: true,
+            arguments: true,
+            dead_code: true, // 去掉死区
+          },
+          mangle: {
+            // 混淆 替换变量
+            toplevel: true,
+          },
+        },
+        extractComments: true,
+        parallel: true,
+      }),
+    ].filter((f) => f),
     usedExports: true,
     chunkIds: "deterministic",
     // moduleIds: "deterministic",

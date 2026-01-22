@@ -20,6 +20,7 @@
     "compression-webpack-plugin": "^11.1.0",
     "copy-webpack-plugin": "^13.0.1",
     "css-minimizer-webpack-plugin": "^7.0.4",
+    "glob": "^13.0.0",
     "html-webpack-plugin": "^5.6.5",
     "jquery": "^3.7.1",
     "loader-utils": "^3.3.1",
@@ -28,6 +29,7 @@
     "mini-css-extract-plugin": "^2.9.4",
     "my-sample-history": "link:../my-sample-history",
     "myLib": "link:lib/myLib",
+    "purgecss-webpack-plugin": "^7.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "webpack-bundle-analyzer": "^5.1.0"
