@@ -112,11 +112,11 @@ module.exports = {
      *  一般用在打包库代码的时候
      *  var window global commonjs amd umd this module (需要开启 experiments.outModule)
      */
-    libraryTarget: "window",
+    // libraryTarget: "window",
     /** 输出绑定的名字
      *  注意 这个属性在 libraryTarget 为 module的情况下 不能使用
      */
-    library: "hello",
+    // library: "hello",
   },
   /** 实验性特性配置 */
   experiments: {
@@ -529,7 +529,10 @@ module.exports = {
       : null,
     /** 用来自动处理react的hmr优化 */
     process.env.NODE_ENV == "development"
-      ? new ReactRefreshWebpackPlugin()
+      ? new ReactRefreshWebpackPlugin({
+        // 不要给库文件注入refresh
+          exclude: [/node_modules/, /my-redux/ ,/my-redux-connect/],
+        })
       : null,
     /** 用来分析打包结果 */
     process.env.Analyze == 1 ? new BundleAnalyzerPlugin() : null,

@@ -1,3 +1,4 @@
 overrides:
   myLib: link:lib/myLib
   my-sample-history: link:../my-sample-history
+  my-redux: link:../my-redux/dist
