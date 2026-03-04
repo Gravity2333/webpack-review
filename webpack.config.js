@@ -435,11 +435,37 @@ module.exports = {
   },
   /** 配置外部依赖 */
   /** 外部依赖导入方式 var */
-  // externalsType: "var",
-  // /** 配置 外部依赖 到 内部包名称的映射 */
-  // externals: {
-  //   jquery: "$",
-  // },
+  externalsType: "promise",
+  externals: {
+    jquery: `promise new Promise((resolve,reject) => {
+
+    const keys = window.jqueryCdnKey || ['https://code.jquery.com/jquery-3.6.0.min.js'];
+   
+    
+    const loadScript = (index) => {
+      if (index >= keys.length) {
+        reject(new Error("Failed to load jQuery"));
+        return;
+      }
+       const script = document.createElement("script");
+      script.src = keys[index];
+      console.log("load jquery from cdn",keys[index],keys);
+      script.onload = () => {
+      
+        // 返回模块对象，而不是直接返回 window.$
+        resolve(window.$);
+      };
+      script.onerror = () => {
+        console.log('err loading from', keys[index]);
+        loadScript(index + 1);
+      };
+         document.head.appendChild(script);
+    };
+    
+ 
+    loadScript(0);
+  })`,
+  },
   /** =========================================== 插件相关 =========================================== */
   /** 用来配置插件Plugin
    *  插件使用 tapable库 通过注册钩子函数的方式，让开发者接入编译流程
@@ -457,8 +483,9 @@ module.exports = {
       cdn: {
         jquery: [
           /** backup cdn */
-          // "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
-          // "https://cdn.bootcdn.net/ajax/libs/react-dom/16.0.0-beta.1/cjs/react-dom-node-stream.production.min.js",
+          "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
+          "https://cdn.bootcdn.net/ajax1223/libs/jquery/3.7.1/jquery.js",
+          "https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.js",
         ],
         // lodash: ["/manager/lib/lodash.js"],
       },
@@ -530,8 +557,8 @@ module.exports = {
     /** 用来自动处理react的hmr优化 */
     process.env.NODE_ENV == "development"
       ? new ReactRefreshWebpackPlugin({
-        // 不要给库文件注入refresh
-          exclude: [/node_modules/, /my-redux/ ,/my-redux-connect/],
+          // 不要给库文件注入refresh
+          exclude: [/node_modules/, /my-redux/, /my-redux-connect/],
         })
       : null,
     /** 用来分析打包结果 */
